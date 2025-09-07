@@ -6,8 +6,8 @@ echo "============================================="
 echo ""
 
 # API Keys for demo account
-DD_API_KEY="cebd641eea33f26fe551354ad85ed530"
-DD_APP_KEY="c863c255c718ba4788d901b34741af94a63c2fb9"
+DD_API_KEY="your-api-key-here"
+DD_APP_KEY="your-app-key-here"
 
 echo ""
 echo "Creating dashboard with system metrics..."
