@@ -213,14 +213,6 @@ spec:
 - **Incident Management**: PagerDuty, Slack
 - **Log Aggregation**: Fluent Bit, FireLens
 
-## 📚 Documentation
-
-- [Setting Up Datadog Monitors](docs/datadog-setup.md)
-- [SLO Configuration Guide](docs/slo-guide.md)
-- [On-Call Best Practices](docs/oncall-practices.md)
-- [Chaos Engineering Playbook](docs/chaos-playbook.md)
-- [Incident Review Template](docs/incident-review.md)
-
 ## 🎓 Lessons Learned
 
 1. **Alert Quality > Quantity**: Fewer, high-quality alerts reduce fatigue
@@ -236,22 +228,3 @@ spec:
 - [ ] Expand chaos scenarios to data layer
 - [ ] Integrate with feature flag system
 - [ ] Build custom Datadog apps for team workflows
-
-## 👥 Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on contributing to this project.
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
-## 🙋 Contact
-
-**Adam** - Platform Engineer & Observability Enthusiast
-- LinkedIn: [Your LinkedIn]
-- GitHub: [@yourusername]
-- Email: your.email@example.com
-
----
-
-*Built with passion for reliability, designed for scale, and optimized for developer happiness.*
