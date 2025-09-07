@@ -1,0 +1,23 @@
+groups:
+  - name: payment-service
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: rate(payment_requests_total{status="error"}[5m]) > 0.01
+        for: 1m
+        labels:
+          severity: critical
+          service: payment-service
+        annotations:
+          summary: "High error rate detected"
+          description: "Payment service error rate is {{ $value }}%"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(payment_latency_seconds_bucket[5m])) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          service: payment-service
+        annotations:
+          summary: "High latency detected"
+          description: "95th percentile latency is {{ $value }}s"

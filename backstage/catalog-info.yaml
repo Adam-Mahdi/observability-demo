@@ -1,0 +1,299 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: e-commerce-platform
+  description: Complete e-commerce platform with payment processing, order management, and inventory tracking
+  annotations:
+    datadog/system-dashboard: https://app.datadoghq.com/dashboard/ecommerce-overview
+spec:
+  owner: platform-team
+  domain: commerce
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payment-service
+  description: Handles all payment processing including credit cards, PayPal, and digital wallets
+  annotations:
+    datadog/dashboard-url: https://app.datadoghq.com/dashboard/payment-service-main
+    datadog/slo-url: https://app.datadoghq.com/slo/payment-service-availability
+    pagerduty/service-id: PD-PAY-001
+    github.com/project-slug: company/payment-service
+    jenkins/job-name: payment-service-pipeline
+    sonarqube/project-key: payment-service
+    grafana/dashboard-url: https://grafana.company.com/d/payment-service
+    backstage.io/techdocs-ref: dir:.
+    kubernetes/namespace: production
+  tags:
+    - java
+    - spring-boot
+    - postgresql
+    - redis
+    - critical
+  links:
+    - url: https://api.company.com/docs/payment
+      title: API Documentation
+      icon: docs
+    - url: https://github.com/company/payment-service
+      title: GitHub Repository
+      icon: github
+    - url: https://app.datadoghq.com/dashboard/payment-service-main
+      title: Datadog Dashboard
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: e-commerce-platform
+  dependsOn:
+    - resource:payment-database
+    - resource:payment-cache
+    - component:notification-service
+  providesApis:
+    - payment-api
+  consumesApis:
+    - stripe-api
+    - paypal-api
+  scorecard:
+    observability:
+      score: 95
+      items:
+        - name: "Dashboard Coverage"
+          status: "pass"
+          score: 100
+          description: "All golden signals covered"
+        - name: "Alert Quality"
+          status: "pass"
+          score: 95
+          description: "Low false positive rate (<5%)"
+        - name: "Distributed Tracing"
+          status: "pass"
+          score: 100
+          description: "Full trace coverage with OpenTelemetry"
+        - name: "Log Aggregation"
+          status: "pass"
+          score: 90
+          description: "Structured logging with correlation IDs"
+        - name: "Custom Metrics"
+          status: "pass"
+          score: 90
+          description: "Business metrics tracked"
+    reliability:
+      score: 92
+      items:
+        - name: "Availability SLO"
+          status: "pass"
+          score: 98
+          description: "99.95% availability (exceeds 99.9% target)"
+        - name: "Latency SLO"
+          status: "pass"
+          score: 94
+          description: "p95 < 450ms (target 500ms)"
+        - name: "Error Rate"
+          status: "pass"
+          score: 96
+          description: "0.4% error rate (target < 1%)"
+        - name: "MTTR"
+          status: "warning"
+          score: 85
+          description: "8 min average (target < 10 min)"
+        - name: "Deployment Frequency"
+          status: "pass"
+          score: 88
+          description: "12 deployments/week"
+    ownership:
+      score: 88
+      items:
+        - name: "On-call Rotation"
+          status: "pass"
+          score: 100
+          description: "Fully staffed 24/7 rotation"
+        - name: "Documentation"
+          status: "pass"
+          score: 85
+          description: "Runbook and API docs up-to-date"
+        - name: "Code Ownership"
+          status: "pass"
+          score: 90
+          description: "CODEOWNERS file maintained"
+        - name: "Knowledge Sharing"
+          status: "warning"
+          score: 75
+          description: "Monthly architecture reviews"
+        - name: "Incident Reviews"
+          status: "pass"
+          score: 90
+          description: "All P1/P2 incidents reviewed"
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: order-service
+  description: Manages order lifecycle from creation to fulfillment
+  annotations:
+    datadog/dashboard-url: https://app.datadoghq.com/dashboard/order-service
+    pagerduty/service-id: PD-ORD-001
+    github.com/project-slug: company/order-service
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: e-commerce-platform
+  dependsOn:
+    - component:payment-service
+    - component:inventory-service
+    - resource:order-database
+  scorecard:
+    observability:
+      score: 88
+      items:
+        - name: "Dashboard Coverage"
+          status: "pass"
+          score: 90
+        - name: "Alert Quality"
+          status: "pass"
+          score: 88
+        - name: "Distributed Tracing"
+          status: "pass"
+          score: 95
+        - name: "Log Aggregation"
+          status: "warning"
+          score: 80
+        - name: "Custom Metrics"
+          status: "pass"
+          score: 87
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: inventory-service
+  description: Real-time inventory tracking and management
+  annotations:
+    datadog/dashboard-url: https://app.datadoghq.com/dashboard/inventory-service
+    pagerduty/service-id: PD-INV-001
+    github.com/project-slug: company/inventory-service
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: e-commerce-platform
+  scorecard:
+    observability:
+      score: 85
+    reliability:
+      score: 90
+    ownership:
+      score: 82
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: payment-database
+  description: PostgreSQL database for payment transactions
+  annotations:
+    datadog/dashboard-url: https://app.datadoghq.com/dashboard/payment-db
+spec:
+  type: database
+  owner: platform-team
+  system: e-commerce-platform
+  lifecycle: production
+  
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: payment-cache
+  description: Redis cache for payment service
+  annotations:
+    datadog/dashboard-url: https://app.datadoghq.com/dashboard/payment-cache
+spec:
+  type: cache
+  owner: platform-team
+  system: e-commerce-platform
+  lifecycle: production
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: payment-api
+  description: REST API for payment processing
+spec:
+  type: openapi
+  lifecycle: production
+  owner: platform-team
+  system: e-commerce-platform
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: Payment API
+      version: 2.0.0
+    servers:
+      - url: https://api.company.com/v2/payments
+    paths:
+      /charge:
+        post:
+          summary: Process a payment
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    amount:
+                      type: number
+                    currency:
+                      type: string
+                    payment_method:
+                      type: string
+      /refund:
+        post:
+          summary: Process a refund
+          requestBody:
+            required: true
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform-team
+  description: Platform Engineering Team
+spec:
+  type: team
+  profile:
+    displayName: Platform Engineering
+    email: platform-team@company.com
+    slack: platform-team
+  parent: engineering
+  children: []
+  members:
+    - adam.smith
+    - jane.doe
+    - john.wilson
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: adam.smith
+spec:
+  profile:
+    displayName: Adam Smith
+    email: adam.smith@company.com
+    picture: https://avatars.company.com/adam.smith
+  memberOf:
+    - platform-team
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: commerce
+  description: E-commerce domain including payments, orders, and inventory
+spec:
+  owner: platform-team

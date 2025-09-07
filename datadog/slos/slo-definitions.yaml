@@ -1,0 +1,261 @@
+slos:
+  - id: payment-service-availability
+    name: "Payment Service Availability"
+    description: "Ensures payment service maintains 99.9% availability for customer transactions"
+    type: monitor_based
+    objective: 99.9
+    timeframe: 30d
+    monitors:
+      - id: payment-health-check
+        weight: 1
+    tags:
+      - service:payment-service
+      - team:platform
+      - critical:true
+    error_budget:
+      target: 99.9
+      window: 30d
+      burn_rate_alerts:
+        - name: "Extreme Burn (1hr)"
+          window: 1h
+          burn_rate: 14.4  # Will exhaust budget in 2 days
+          severity: P1
+          alert_channel: pagerduty
+        - name: "High Burn (6hr)"  
+          window: 6h
+          burn_rate: 6     # Will exhaust budget in 5 days
+          severity: P1
+          alert_channel: pagerduty
+        - name: "Moderate Burn (1d)"
+          window: 1d
+          burn_rate: 3     # Will exhaust budget in 10 days
+          severity: P2
+          alert_channel: slack
+        - name: "Low Burn (3d)"
+          window: 3d
+          burn_rate: 1     # Will exhaust budget in 30 days
+          severity: P3
+          alert_channel: email
+    annotations:
+      runbook_url: "https://github.com/org/runbooks/payment-service-availability.md"
+      dashboard_url: "https://app.datadoghq.com/dashboard/payment-service"
+      
+  - id: api-latency-slo
+    name: "API Gateway Latency"
+    description: "95% of API requests complete within 500ms"
+    type: metric_based
+    objective: 95
+    timeframe: 30d
+    sli:
+      query:
+        good: |
+          sum:trace.http.request{service:api-gateway,env:production,duration:<500ms}.as_count()
+        total: |
+          sum:trace.http.request{service:api-gateway,env:production}.as_count()
+    tags:
+      - service:api-gateway
+      - team:platform
+      - performance:true
+    error_budget:
+      target: 95
+      window: 30d
+      actions:
+        - budget_remaining_percent: 50
+          action: "Review and optimize slow endpoints"
+        - budget_remaining_percent: 25
+          action: "Feature freeze - focus on performance"
+        - budget_remaining_percent: 10
+          action: "Rollback recent changes, emergency optimization"
+    
+  - id: database-query-performance
+    name: "Database Query Performance"
+    description: "99% of database queries complete within 100ms"
+    type: metric_based
+    objective: 99
+    timeframe: 7d
+    sli:
+      query:
+        good: |
+          sum:postgresql.query.duration{env:production,duration:<100ms}.as_count()
+        total: |
+          sum:postgresql.query.duration{env:production}.as_count()
+    tags:
+      - service:database
+      - team:platform
+      - performance:true
+    error_budget:
+      target: 99
+      window: 7d
+      automated_actions:
+        - trigger: budget_consumed > 50%
+          action: "Enable query performance insights"
+        - trigger: budget_consumed > 75%
+          action: "Auto-scale read replicas"
+        - trigger: budget_consumed > 90%
+          action: "Enable emergency caching layer"
+
+  - id: order-processing-success
+    name: "Order Processing Success Rate"
+    description: "99.5% of orders are processed successfully without errors"
+    type: metric_based
+    objective: 99.5
+    timeframe: 30d
+    sli:
+      query:
+        good: |
+          sum:custom.order.processed{status:success,env:production}.as_count()
+        total: |
+          sum:custom.order.processed{env:production}.as_count()
+    tags:
+      - service:order-service
+      - team:platform
+      - business-critical:true
+    error_budget:
+      target: 99.5
+      window: 30d
+      reporting:
+        - type: weekly_summary
+          recipients: ["platform-team@company.com", "product@company.com"]
+        - type: monthly_review
+          recipients: ["engineering-leadership@company.com"]
+
+  - id: data-pipeline-freshness
+    name: "Data Pipeline Freshness"
+    description: "Analytics data is updated within 15 minutes 99% of the time"
+    type: metric_based
+    objective: 99
+    timeframe: 7d
+    sli:
+      query:
+        good: |
+          sum:custom.data.pipeline.lag{env:production,lag_minutes:<15}.as_count()
+        total: |
+          sum:custom.data.pipeline.lag{env:production}.as_count()
+    tags:
+      - service:data-pipeline
+      - team:data-platform
+    error_budget:
+      target: 99
+      window: 7d
+
+slo_dashboards:
+  - name: "SLO Overview Dashboard"
+    widgets:
+      - type: slo_summary
+        title: "Service Level Objectives - Current Status"
+        slos:
+          - payment-service-availability
+          - api-latency-slo
+          - database-query-performance
+          - order-processing-success
+        display:
+          - current_status
+          - trend_7d
+          - budget_remaining
+          - time_to_exhaustion
+          
+      - type: error_budget_burn_down
+        title: "Error Budget Consumption (30 days)"
+        slos:
+          - payment-service-availability
+          - api-latency-slo
+        visualization: stacked_area
+        
+      - type: slo_history
+        title: "Historical SLO Performance"
+        timeframe: 90d
+        slos: all
+        group_by: team
+
+error_budget_policies:
+  - name: "Standard Error Budget Policy"
+    applies_to:
+      - tag: team:platform
+    rules:
+      - condition: budget_remaining > 50%
+        policy: "Normal feature development velocity"
+        
+      - condition: budget_remaining <= 50% AND budget_remaining > 25%
+        policy: |
+          - Increased focus on reliability
+          - All changes require additional testing
+          - Post-deployment monitoring required for 1 hour
+          
+      - condition: budget_remaining <= 25% AND budget_remaining > 10%
+        policy: |
+          - Feature freeze except for reliability improvements
+          - All changes require approval from SRE lead
+          - Mandatory load testing for all changes
+          - Extended post-deployment monitoring (4 hours)
+          
+      - condition: budget_remaining <= 10%
+        policy: |
+          - Complete feature freeze
+          - Only P0/P1 bug fixes allowed
+          - Rollback of recent risky changes
+          - Daily reliability review meetings
+          - Executive visibility required
+
+  - name: "Critical Service Error Budget Policy"
+    applies_to:
+      - tag: critical:true
+    rules:
+      - condition: budget_remaining <= 75%
+        policy: "Immediate SRE review required"
+        
+      - condition: budget_remaining <= 50%
+        policy: "Feature freeze, focus on reliability"
+        
+      - condition: budget_remaining <= 25%
+        policy: "Emergency response team activated"
+
+slo_reporting:
+  weekly_report:
+    enabled: true
+    day: monday
+    time: "09:00"
+    recipients:
+      - platform-team@company.com
+      - engineering-managers@company.com
+    include:
+      - slo_status_summary
+      - error_budget_consumption
+      - incidents_impacting_slos
+      - top_error_contributors
+      - improvement_recommendations
+      
+  monthly_review:
+    enabled: true
+    day: 1
+    time: "10:00"
+    recipients:
+      - engineering-leadership@company.com
+      - product-team@company.com
+    include:
+      - executive_summary
+      - slo_performance_trends
+      - error_budget_analysis
+      - incident_correlation
+      - capacity_planning_insights
+      - quarterly_projections
+
+slo_automation:
+  - trigger: "SLO breach detected"
+    actions:
+      - create_incident_ticket
+      - notify_on_call
+      - enable_detailed_logging
+      - capture_diagnostics
+      
+  - trigger: "Error budget < 25%"
+    actions:
+      - enforce_deployment_freeze
+      - require_sre_approval
+      - increase_monitoring_granularity
+      
+  - trigger: "Error budget exhausted"
+    actions:
+      - block_all_deployments
+      - page_engineering_leadership
+      - initiate_war_room
+      - enable_emergency_runbooks

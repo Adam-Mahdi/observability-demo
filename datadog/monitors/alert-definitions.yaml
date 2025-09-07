@@ -1,0 +1,414 @@
+monitors:
+  - name: "High Error Rate - Payment Service"
+    type: metric alert
+    query: |
+      sum(last_5m):sum:trace.http.request.errors{service:payment-service,env:production}.as_rate() 
+      / sum:trace.http.request.hits{service:payment-service,env:production}.as_rate() * 100 > 1
+    message: |
+      {{#is_alert}}
+      🚨 **ALERT: High Error Rate Detected**
+      
+      Service: Payment Service
+      Environment: Production
+      Current Error Rate: {{value}}%
+      Threshold: 1%
+      
+      **Impact**: Customer payments may be failing
+      
+      **Quick Actions**:
+      1. Check [Payment Service Dashboard](https://app.datadoghq.com/dashboard/payment-service)
+      2. Review recent deployments: `kubectl rollout history deployment/payment-service`
+      3. Check logs: `kubectl logs -l app=payment-service --tail=100`
+      
+      **Runbook**: [Payment Service Runbook](https://github.com/org/runbooks/payment-service.md)
+      
+      @slack-platform-team @pagerduty-platform
+      {{/is_alert}}
+      
+      {{#is_recovery}}
+      ✅ **RECOVERED: Error rate back to normal**
+      Service: Payment Service
+      Current Error Rate: {{value}}%
+      {{/is_recovery}}
+    tags:
+      - service:payment-service
+      - env:production
+      - team:platform
+      - severity:P1
+    options:
+      thresholds:
+        critical: 1
+        warning: 0.5
+      notify_no_data: true
+      no_data_timeframe: 10
+      renotify_interval: 0
+
+  - name: "High Latency - API Gateway"
+    type: metric alert
+    query: |
+      avg(last_5m):avg:trace.http.request.duration.p95{service:api-gateway,env:production} > 500
+    message: |
+      {{#is_alert}}
+      ⚠️ **WARNING: High Latency Detected**
+      
+      Service: API Gateway
+      Current p95 Latency: {{value}}ms
+      SLO Threshold: 500ms
+      
+      **Potential Causes**:
+      - Downstream service degradation
+      - Database connection pool exhaustion
+      - Memory pressure
+      
+      **Investigation Steps**:
+      1. Check [Dependency Map](https://app.datadoghq.com/apm/map)
+      2. Review slow queries: `SELECT * FROM pg_stat_statements ORDER BY mean_time DESC LIMIT 10;`
+      3. Check resource utilization
+      
+      @slack-platform-team
+      {{/is_alert}}
+    tags:
+      - service:api-gateway
+      - env:production
+      - team:platform
+      - severity:P2
+    options:
+      thresholds:
+        critical: 500
+        warning: 400
+      evaluation_delay: 60
+
+  - name: "Pod Restart Loop Detected"
+    type: query alert
+    query: |
+      sum(last_10m):sum:kubernetes.containers.restarts{env:production} by {pod_name}.as_count() > 3
+    message: |
+      {{#is_alert}}
+      🔄 **ALERT: Pod Restart Loop**
+      
+      Pod: {{pod_name.name}}
+      Restart Count: {{value}}
+      
+      **Common Causes**:
+      - OOMKilled
+      - Liveness probe failures
+      - Configuration errors
+      
+      **Debug Commands**:
+      ```bash
+      kubectl describe pod {{pod_name.name}}
+      kubectl logs {{pod_name.name}} --previous
+      kubectl get events --field-selector involvedObject.name={{pod_name.name}}
+      ```
+      
+      @slack-platform-team
+      {{/is_alert}}
+    tags:
+      - env:production
+      - team:platform
+      - severity:P2
+    options:
+      thresholds:
+        critical: 3
+      new_group_delay: 60
+
+  - name: "SLO Multi-Window Burn Rate - Payment Service Availability"
+    type: slo alert
+    slo_id: "payment-service-availability"
+    message: |
+      {{#is_alert}}
+      🔥 **SLO BURN RATE ALERT - MULTI-WINDOW DETECTION**
+      
+      Service: Payment Service
+      SLO Target: 99.9% Availability
+      Current Error Budget Remaining: {{error_budget_remaining}}%
+      
+      **Burn Rate Status**:
+      Short Window ({{short_window}}): {{short_burn_rate}}x
+      Long Window ({{long_window}}): {{long_burn_rate}}x
+      
+      **Error Budget Consumption**:
+      - Budget consumed (30d): {{budget_consumed_percentage}}%
+      - Time to exhaustion: {{time_to_exhaustion}}
+      - Projected monthly consumption: {{projected_consumption}}%
+      
+      **ERROR BUDGET POLICY ENFORCEMENT**:
+      {{#budget_remaining > 50}}
+      ✅ Normal operations - Feature development allowed
+      {{/budget_remaining}}
+      
+      {{#budget_remaining <= 50 && budget_remaining > 25}}
+      ⚠️ CAUTION - Increased reliability focus required
+      - All changes require additional testing
+      - Post-deployment monitoring extended to 1 hour
+      {{/budget_remaining}}
+      
+      {{#budget_remaining <= 25 && budget_remaining > 10}}
+      🚫 FEATURE FREEZE ACTIVE
+      - Only reliability improvements allowed
+      - SRE approval required for all changes
+      - Mandatory load testing before deployment
+      {{/budget_remaining}}
+      
+      {{#budget_remaining <= 10}}
+      🆘 EMERGENCY MODE
+      - Complete feature freeze
+      - Only P0/P1 fixes allowed
+      - Executive visibility required
+      - Consider rollback of recent changes
+      {{/budget_remaining}}
+      
+      **Required Actions**:
+      1. Check [Real-time Dashboard](https://app.datadoghq.com/dashboard/payment-service)
+      2. Review recent deployments: `kubectl rollout history deployment/payment-service`
+      3. Apply error budget policy above
+      
+      **Runbook**: [Payment Service SLO Runbook](https://github.com/org/runbooks/payment-slo.md)
+      
+      @slack-platform-team {{#severity:P1}}@pagerduty-platform{{/severity}}
+      {{/is_alert}}
+      
+      {{#is_recovery}}
+      ✅ **RECOVERED: Burn rate back to acceptable levels**
+      Service: Payment Service
+      Error Budget Remaining: {{error_budget_remaining}}%
+      Policy Status: {{policy_status}}
+      {{/is_recovery}}
+    tags:
+      - slo:availability
+      - service:payment-service
+      - team:platform
+    multi_burn_rate_configurations:
+      # Page immediately - High severity
+      - short_window: 5m
+        long_window: 1h
+        burn_rate_threshold: 14.4  # Will exhaust budget in 2 days
+        severity: P1
+        alert_type: page
+        
+      - short_window: 30m
+        long_window: 6h
+        burn_rate_threshold: 6     # Will exhaust budget in 5 days
+        severity: P1
+        alert_type: page
+        
+      # Wake up - Medium severity  
+      - short_window: 2h
+        long_window: 1d
+        burn_rate_threshold: 3     # Will exhaust budget in 10 days
+        severity: P2
+        alert_type: slack
+        
+      # Heads up - Low severity
+      - short_window: 6h
+        long_window: 3d
+        burn_rate_threshold: 1     # Will exhaust budget in 30 days
+        severity: P3
+        alert_type: ticket
+
+  - name: "Error Budget Policy Enforcement"
+    type: slo alert
+    slo_id: "payment-service-availability"
+    message: |
+      {{#is_alert}}
+      📊 **ERROR BUDGET POLICY STATUS CHANGE**
+      
+      Service: Payment Service
+      Previous Status: {{previous_policy_status}}
+      Current Status: {{current_policy_status}}
+      Error Budget Remaining: {{error_budget_remaining}}%
+      
+      **POLICY NOW IN EFFECT**:
+      {{policy_description}}
+      
+      **Required Team Actions**:
+      {{policy_actions}}
+      
+      **Deployment Restrictions**:
+      {{deployment_restrictions}}
+      
+      **Notification Recipients**:
+      {{notification_list}}
+      
+      Dashboard: https://app.datadoghq.com/slo/payment-service-availability
+      Policy Documentation: https://docs.company.com/error-budget-policy
+      
+      {{#is_warning}}@slack-platform-team{{/is_warning}}
+      {{#is_alert}}@slack-platform-team @slack-engineering-leads{{/is_alert}}
+      {{#is_critical}}@slack-platform-team @slack-engineering-leads @email-cto{{/is_critical}}
+      {{/is_alert}}
+    tags:
+      - slo:availability
+      - service:payment-service
+      - type:policy-enforcement
+    thresholds:
+      ok: "> 50"        # Normal operations
+      warning: "<= 50"  # Increased focus
+      alert: "<= 25"    # Feature freeze
+      critical: "<= 10" # Emergency mode
+      
+  - name: "Alert Fatigue Detection"
+    type: composite
+    query: |
+      sum(last_1h):events('priority:normal source:datadog tags:alert_fired').rollup(count).last() > 20
+    message: |
+      {{#is_alert}}
+      📊 **ALERT FATIGUE WARNING**
+      
+      Too many alerts fired in the last hour: {{value}}
+      
+      **Action Required**:
+      - Review alert thresholds
+      - Consider grouping related alerts
+      - Tune noisy monitors
+      
+      [Alert Analytics Dashboard](https://app.datadoghq.com/dashboard/alert-analytics)
+      
+      @slack-platform-team-lead
+      {{/is_alert}}
+    tags:
+      - team:platform
+      - type:meta-alert
+      - severity:P3
+
+  - name: "Database Connection Pool Saturation"
+    type: metric alert
+    query: |
+      avg(last_5m):avg:postgresql.connections.active{env:production} 
+      / avg:postgresql.connections.max{env:production} * 100 > 80
+    message: |
+      {{#is_alert}}
+      🗄️ **WARNING: Database Connection Pool Near Capacity**
+      
+      Current Usage: {{value}}%
+      Threshold: 80%
+      
+      **Immediate Actions**:
+      1. Check for connection leaks
+      2. Review slow queries
+      3. Consider scaling connection pool
+      
+      **Queries to Run**:
+      ```sql
+      -- Active connections by state
+      SELECT state, count(*) 
+      FROM pg_stat_activity 
+      GROUP BY state;
+      
+      -- Long-running queries
+      SELECT pid, now() - pg_stat_activity.query_start AS duration, query 
+      FROM pg_stat_activity 
+      WHERE (now() - pg_stat_activity.query_start) > interval '5 minutes';
+      ```
+      
+      @slack-database-team @slack-platform-team
+      {{/is_alert}}
+    tags:
+      - resource:database
+      - env:production
+      - team:platform
+      - severity:P2
+    options:
+      thresholds:
+        critical: 80
+        warning: 70
+
+  - name: "Kubernetes Node Memory Pressure"
+    type: metric alert  
+    query: |
+      avg(last_5m):avg:kubernetes.memory.usage{env:production} by {node} 
+      / avg:kubernetes.memory.capacity{env:production} by {node} * 100 > 85
+    message: |
+      {{#is_alert}}
+      💾 **ALERT: Node Memory Pressure**
+      
+      Node: {{node.name}}
+      Memory Usage: {{value}}%
+      
+      **Risk**: Pods may be evicted due to memory pressure
+      
+      **Actions**:
+      1. Check memory-intensive pods: `kubectl top pods --all-namespaces --sort-by=memory`
+      2. Review recent deployments for memory leaks
+      3. Consider node scaling if consistent
+      
+      @slack-platform-team
+      {{/is_alert}}
+    tags:
+      - resource:kubernetes
+      - env:production
+      - team:platform
+      - severity:P2
+    options:
+      thresholds:
+        critical: 85
+        warning: 75
+
+  - name: "Certificate Expiration Warning"
+    type: metric alert
+    query: |
+      min(last_5m):min:tls.cert.expiration.days{env:production} by {hostname} < 30
+    message: |
+      {{#is_alert}}
+      🔐 **WARNING: Certificate Expiring Soon**
+      
+      Hostname: {{hostname.name}}
+      Days Until Expiration: {{value}}
+      
+      **Action Required**:
+      - Renew certificate before expiration
+      - Update cert-manager if using automatic renewal
+      
+      @slack-security-team @slack-platform-team
+      {{/is_alert}}
+    tags:
+      - security:certificate
+      - env:production
+      - team:platform
+      - severity:P2
+    options:
+      thresholds:
+        critical: 7
+        warning: 30
+
+alert_routing_rules:
+  - name: "P1 Alerts"
+    conditions:
+      - tag: severity:P1
+    notification_channels:
+      - pagerduty
+      - slack-incidents
+      - email-oncall
+    escalation_time: 5m
+    
+  - name: "P2 Alerts"
+    conditions:
+      - tag: severity:P2
+    notification_channels:
+      - slack-platform-team
+      - email-team
+    escalation_time: 15m
+    
+  - name: "P3-P4 Alerts"
+    conditions:
+      - tag: severity:P3
+      - tag: severity:P4
+    notification_channels:
+      - slack-platform-team
+    escalation_time: 60m
+
+notification_channels:
+  pagerduty:
+    integration_key: "${PAGERDUTY_INTEGRATION_KEY}"
+    
+  slack:
+    workspaces:
+      - name: primary
+        webhooks:
+          platform-team: "${SLACK_PLATFORM_WEBHOOK}"
+          incidents: "${SLACK_INCIDENTS_WEBHOOK}"
+          
+  email:
+    groups:
+      oncall: "oncall@company.com"
+      team: "platform-team@company.com"

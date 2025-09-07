@@ -1,0 +1,48 @@
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.backup
+*.bak
+
+# LibreOffice lock files
+.~lock.*
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Data directories
+data/prometheus/*
+data/grafana/*
+
+# Docker volumes
+prometheus_data/
+grafana_data/
+
+# Personal notes
+personal-notes.txt
+TODO.txt
+notes.md
+
+# IDE
+.vscode/
+.idea/
+*.iml

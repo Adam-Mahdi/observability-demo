@@ -1,0 +1,458 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: payment-service-chaos
+  namespace: production
+spec:
+  appinfo:
+    appns: production
+    applabel: app=payment-service
+    appkind: deployment
+  engineState: active
+  chaosServiceAccount: litmus-admin
+  monitoring: true
+  jobCleanUpPolicy: retain
+  experiments:
+    - name: pod-delete
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: "60"
+            - name: CHAOS_INTERVAL
+              value: "10"
+            - name: FORCE
+              value: "false"
+            - name: PODS_AFFECTED_PERC
+              value: "30"
+        probe:
+          - name: payment-service-health-check
+            type: httpProbe
+            httpProbe/inputs:
+              url: http://payment-service.production.svc.cluster.local:8080/health
+              insecureSkipVerify: false
+              responseTimeout: 5000
+              method:
+                get:
+                  criteria: ==
+                  responseCode: "200"
+            runProperties:
+              probeTimeout: 10
+              interval: 5
+              retry: 3
+              probePollingInterval: 2
+
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: network-latency-chaos
+  namespace: production
+spec:
+  appinfo:
+    appns: production
+    applabel: app=payment-service
+    appkind: deployment
+  engineState: active
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-network-latency
+      spec:
+        components:
+          env:
+            - name: TARGET_CONTAINER
+              value: payment-service
+            - name: NETWORK_INTERFACE
+              value: eth0
+            - name: LIB_IMAGE
+              value: litmuschaos/go-runner:latest
+            - name: NETWORK_LATENCY
+              value: "300"  # 300ms latency
+            - name: TOTAL_CHAOS_DURATION
+              value: "120"
+            - name: DESTINATION_IPS
+              value: "10.0.1.5"  # Database IP
+            - name: DESTINATION_HOSTS
+              value: "payment-db.rds.amazonaws.com"
+        probe:
+          - name: latency-check
+            type: promProbe
+            promProbe/inputs:
+              endpoint: http://prometheus.monitoring.svc.cluster.local:9090
+              query: |
+                histogram_quantile(0.95, 
+                  rate(http_request_duration_seconds_bucket{
+                    service="payment-service"
+                  }[1m])
+                ) < 0.5
+              comparator:
+                type: float
+                criteria: <
+                value: "0.5"
+            runProperties:
+              probeTimeout: 10
+              interval: 5
+
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: cpu-stress-chaos
+  namespace: production
+spec:
+  appinfo:
+    appns: production
+    applabel: app=payment-service
+    appkind: deployment
+  engineState: active
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-cpu-hog
+      spec:
+        components:
+          env:
+            - name: TARGET_CONTAINER
+              value: payment-service
+            - name: CPU_CORES
+              value: "2"
+            - name: CPU_LOAD
+              value: "80"  # 80% CPU load
+            - name: TOTAL_CHAOS_DURATION
+              value: "180"
+            - name: PODS_AFFECTED_PERC
+              value: "50"
+        probe:
+          - name: cpu-utilization-check
+            type: k8sProbe
+            k8sProbe/inputs:
+              group: ""
+              version: v1
+              resource: pods
+              namespace: production
+              fieldSelector: status.phase=Running
+              labelSelector: app=payment-service
+              operation: present
+            runProperties:
+              probeTimeout: 30
+              interval: 10
+
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: disk-fill-chaos
+  namespace: production
+spec:
+  appinfo:
+    appns: production
+    applabel: app=payment-service
+    appkind: deployment
+  engineState: active
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: disk-fill
+      spec:
+        components:
+          env:
+            - name: TARGET_CONTAINER
+              value: payment-service
+            - name: FILL_PERCENTAGE
+              value: "80"
+            - name: TOTAL_CHAOS_DURATION
+              value: "120"
+            - name: DATA_BLOCK_SIZE
+              value: "256"
+        probe:
+          - name: disk-usage-check
+            type: cmdProbe
+            cmdProbe/inputs:
+              command: |
+                df -h | grep -E "/$" | awk '{print substr($5, 1, length($5)-1)}'
+              comparator:
+                type: int
+                criteria: <
+                value: "90"
+            runProperties:
+              probeTimeout: 10
+              interval: 5
+
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: database-connection-chaos
+  namespace: production
+spec:
+  appinfo:
+    appns: production
+    applabel: app=payment-service
+    appkind: deployment
+  engineState: active
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-network-partition
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: "60"
+            - name: DESTINATION_IPS
+              value: "10.0.1.5"  # Database IP
+            - name: DESTINATION_HOSTS
+              value: "payment-db.rds.amazonaws.com"
+            - name: POLICY_TYPES
+              value: "egress"
+        probe:
+          - name: database-connectivity
+            type: httpProbe
+            httpProbe/inputs:
+              url: http://payment-service.production.svc.cluster.local:8080/health/db
+              method:
+                get:
+                  criteria: ==
+                  responseCode: "200"
+            runProperties:
+              probeTimeout: 10
+              interval: 5
+              retry: 3
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaos-scenarios
+  namespace: production
+data:
+  payment-gateway-outage.yaml: |
+    name: Payment Gateway Outage Simulation
+    description: Simulates complete payment provider outage
+    duration: 30m
+    target: payment-service
+    scenario:
+      - block_external_traffic:
+          hosts:
+            - api.stripe.com
+            - api.paypal.com
+          duration: 10m
+      - verify_fallback:
+          expected_behavior: "Service switches to offline processing"
+          slo_impact: "Error rate should stay below 5%"
+      - restore_connectivity:
+          gradual: true
+          duration: 5m
+      - verify_recovery:
+          metrics:
+            - payment_success_rate > 0.95
+            - queue_depth < 100
+    
+  cascading-failure.yaml: |
+    name: Cascading Service Failure
+    description: Tests resilience to cascading failures
+    duration: 45m
+    sequence:
+      - step: Database slowdown
+        action:
+          type: network-latency
+          target: database
+          latency: 500ms
+          duration: 5m
+      - step: Cache failure
+        action:
+          type: pod-delete
+          target: redis-cache
+          instances: all
+      - step: Payment service stress
+        action:
+          type: cpu-stress
+          target: payment-service
+          load: 90%
+          duration: 10m
+      - step: Verify circuit breakers
+        validation:
+          - circuit_breaker_state: open
+          - fallback_active: true
+          - customer_impact: minimal
+    
+  data-corruption-test.yaml: |
+    name: Data Corruption Resilience
+    description: Tests handling of corrupted data scenarios
+    duration: 20m
+    target: payment-service
+    scenario:
+      - corrupt_cache_data:
+          percentage: 10
+          duration: 5m
+      - verify_detection:
+          expected_logs: "Cache corruption detected"
+          expected_action: "Cache invalidation triggered"
+      - verify_recovery:
+          metrics:
+            - cache_hit_rate > 0.8
+            - no_data_loss: true
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: game-day-runbook
+  namespace: production
+data:
+  runbook.md: |
+    # Game Day Runbook
+    
+    ## Pre-Game Day Checklist
+    - [ ] All participants notified (24h advance)
+    - [ ] Customer support team aware
+    - [ ] Monitoring dashboards loaded
+    - [ ] Rollback procedures verified
+    - [ ] Communication channels open
+    - [ ] Recording setup for post-game review
+    
+    ## Scenarios
+    
+    ### Scenario 1: Payment Provider Outage (30 minutes)
+    **Objective**: Validate fallback mechanisms and customer communication
+    
+    **Execution**:
+    1. T+0: Block Stripe API traffic
+    2. T+5: Verify circuit breaker activation
+    3. T+10: Check offline payment queue
+    4. T+15: Block PayPal API traffic
+    5. T+20: Verify multi-provider fallback
+    6. T+25: Restore connectivity
+    7. T+30: Verify queue processing
+    
+    **Success Criteria**:
+    - No customer-visible errors
+    - All payments eventually processed
+    - MTTR < 5 minutes
+    
+    ### Scenario 2: Database Failure (45 minutes)
+    **Objective**: Test read replica failover and cache resilience
+    
+    **Execution**:
+    1. T+0: Kill primary database connections
+    2. T+2: Verify read replica promotion
+    3. T+10: Introduce replica lag
+    4. T+15: Test cache-only mode
+    5. T+25: Restore primary database
+    6. T+30: Verify data consistency
+    7. T+45: Complete recovery verification
+    
+    **Success Criteria**:
+    - Failover completed < 2 minutes
+    - Read traffic maintained throughout
+    - Zero data loss
+    
+    ### Scenario 3: Cascading Failure (60 minutes)
+    **Objective**: Validate service isolation and gradual degradation
+    
+    **Execution**:
+    1. T+0: Inject latency in order service
+    2. T+10: Increase payment service load
+    3. T+20: Fail inventory service
+    4. T+30: Verify service isolation
+    5. T+40: Begin recovery sequence
+    6. T+50: Verify full restoration
+    7. T+60: Review metrics and logs
+    
+    **Success Criteria**:
+    - Core payment flow maintained
+    - Graceful degradation observed
+    - No complete system failure
+    
+    ## Communication Templates
+    
+    ### Start Announcement
+    ```
+    🎮 GAME DAY STARTING
+    Scenario: [Name]
+    Duration: [X] minutes
+    Impact: Controlled testing environment
+    Monitoring: [Dashboard Link]
+    Questions: #game-day-channel
+    ```
+    
+    ### Issue Detected
+    ```
+    ⚠️ ISSUE DETECTED
+    Time: T+[X]
+    System: [Component]
+    Impact: [Description]
+    Response: [Action being taken]
+    ```
+    
+    ### Recovery Complete
+    ```
+    ✅ RECOVERY COMPLETE
+    Duration: [X] minutes
+    Systems affected: [List]
+    Customer impact: [None/Minimal/Significant]
+    Lessons learned: [Brief summary]
+    ```
+    
+    ## Post-Game Day
+    - [ ] Collect all metrics and logs
+    - [ ] Document timeline of events
+    - [ ] Calculate actual vs. expected MTTR
+    - [ ] Schedule review meeting (within 48h)
+    - [ ] Update runbooks with findings
+    - [ ] Share lessons learned
+    - [ ] Plan improvements
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: chaos-scheduler
+  namespace: production
+spec:
+  schedule: "0 14 * * 3"  # Every Wednesday at 2 PM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: litmus-admin
+          containers:
+          - name: chaos-runner
+            image: litmuschaos/chaos-operator:latest
+            env:
+            - name: EXPERIMENT_NAME
+              value: "weekly-chaos-drill"
+            - name: NOTIFY_SLACK
+              value: "true"
+            - name: SLACK_WEBHOOK
+              valueFrom:
+                secretKeyRef:
+                  name: slack-webhook
+                  key: url
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # Select random experiment
+              EXPERIMENTS=("pod-delete" "network-latency" "cpu-stress")
+              SELECTED=${EXPERIMENTS[$RANDOM % ${#EXPERIMENTS[@]}]}
+              
+              # Run experiment
+              kubectl apply -f /experiments/$SELECTED.yaml
+              
+              # Wait for completion
+              sleep 300
+              
+              # Collect results
+              kubectl logs -l name=chaos-exporter -n production > /tmp/results.log
+              
+              # Send notification
+              curl -X POST $SLACK_WEBHOOK -d "{
+                \"text\": \"Chaos experiment completed: $SELECTED\",
+                \"attachments\": [{
+                  \"color\": \"good\",
+                  \"fields\": [{
+                    \"title\": \"Experiment\",
+                    \"value\": \"$SELECTED\",
+                    \"short\": true
+                  }]
+                }]
+              }"
+          restartPolicy: OnFailure

@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # Sample microservices that generate real metrics
+  payment-service:
+    image: nginx:alpine
+    container_name: payment-service
+    ports:
+      - "8081:80"
+    volumes:
+      - ./demo-app/payment.conf:/etc/nginx/conf.d/default.conf
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=80"
+      - "prometheus.io/path=/metrics"
+
+  order-service:
+    image: nginx:alpine
+    container_name: order-service
+    ports:
+      - "8082:80"
+    volumes:
+      - ./demo-app/order.conf:/etc/nginx/conf.d/default.conf
+
+  # Load generator to create traffic
+  load-generator:
+    image: williamyeh/wrk
+    container_name: load-generator
+    command: -t2 -c10 -d300s --latency http://payment-service/api/payment
+    depends_on:
+      - payment-service
+    restart: unless-stopped
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=redis-datasource
+    volumes:
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - grafana_data:/var/lib/grafana
+
+  # Alert manager for alerting
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # Receive traces
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=9411
+
+  # Redis for demonstrating cache metrics
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  # Chaos engineering - randomly kills containers
+  chaos-monkey:
+    image: busybox
+    container_name: chaos-monkey
+    command: sh -c "while true; do sleep $$((RANDOM % 60 + 30)); docker kill payment-service 2>/dev/null; sleep 10; docker start payment-service 2>/dev/null; done"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    profiles:
+      - chaos
+
+volumes:
+  prometheus_data:
+  grafana_data:
