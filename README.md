@@ -80,7 +80,7 @@ helm install datadog-agent datadog/datadog \
 # Deploy Backstage catalog
 kubectl apply -f backstage/
 
-## Quick Start / Running the Demo
+# Quick Start / Running the Demo
 
 # Start local demo environment
 ./start-demo.sh
