@@ -81,6 +81,24 @@ helm install datadog-agent datadog/datadog \
 kubectl apply -f backstage/
 ```
 
+## Quick Start / Running the Demo
+
+# Start local demo environment
+./start-demo.sh
+
+# Create Datadog monitoring (add your API keys first)
+./datadog/create-dashboard.sh
+./datadog/create-monitor.sh
+./datadog/create-slo.sh
+
+# View metrics
+open http://localhost:8080
+
+# Simulate an incident
+./simulate-outage.sh
+
+
+
 ## Key Features
 
 ### 1. Datadog Monitoring 
