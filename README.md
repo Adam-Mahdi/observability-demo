@@ -2,15 +2,15 @@
 
 > Observability implementation showcasing modern SRE practices, monitoring, and developer.
 
-## 🎯 Project Overview
+## Project Overview
 
 This repository demonstrates a comprehensive observability solution designed for cloud-native environments, featuring:
 
-- **Real-time monitoring** with Datadog dashboards and intelligent alerting
+- **Real-time monitoring** with Datadog dashboards and alerting
 - **SLO-driven reliability** with error budgets and automated tracking
-- **Service ownership** through Backstage catalog integration
-- **Chaos engineering** practices for proactive resilience testing
-- **On-call excellence** with battle-tested runbooks and incident response
+- **Service ownership** through backstage catalog integration
+- **Chaos engineering** practices for resilience testing
+- **On-call Incident response** with runbooks and incident response
 
 ## Architecture
 
@@ -139,7 +139,7 @@ slo:
 - API response times
 - Cache hit rates
 
-### 3. On-Call Excellence
+### 3. On-call Incident response
 
 #### Runbook Template
 Each service includes:
@@ -200,7 +200,7 @@ spec:
 2. **Database Connection Pool Exhaustion** (45-min drill)
 3. **Cascading Service Failure** (60-min drill)
 
-## 📈 Metrics & Results
+## Metrics & Results
 
 ### MTTR Improvements
 | Quarter | Before | After | Improvement |
