@@ -1,6 +1,6 @@
 # Observability Demo
 
-> Observability implementation showcasing modern SRE practices, monitoring, and developer.
+> Observability implementation showcasing modern SRE practices and monitoring.
 
 ## Project Overview
 
@@ -10,7 +10,7 @@ This repository demonstrates a comprehensive observability solution designed for
 - **SLO-driven reliability** with error budgets and automated tracking
 - **Service ownership** through backstage catalog integration
 - **Chaos engineering** practices for resilience testing
-- **On-call Incident response** with runbooks and incident response
+- **Incident response** with runbooks and incident response
 
 ## Architecture
 
@@ -139,7 +139,7 @@ slo:
 - API response times
 - Cache hit rates
 
-### 3. On-call Incident response
+### 3. Incident response
 
 #### Runbook Template
 Each service includes:
@@ -200,7 +200,7 @@ spec:
 2. **Database Connection Pool Exhaustion** (45-min drill)
 3. **Cascading Service Failure** (60-min drill)
 
-## Metrics & Results
+## Metrics & Results (Expected)
 
 ### MTTR Improvements
 | Quarter | Before | After | Improvement |
@@ -209,12 +209,12 @@ spec:
 | Q2 2024 | 42 min | 8 min | 81% ⬇️ |
 | Q3 2024 | 38 min | 6 min | 84% ⬇️ |
 
-### Alert Noise Reduction
+### Alert Noise Reduction (Expected)
 - **62%** reduction in false positives
 - **78%** improvement in actionable alerts
 - **91%** on-call satisfaction score
 
-### Service Reliability
+### Service Reliability (Expected)
 - **99.95%** average availability (exceeding 99.9% SLO)
 - **0.8** error budget consumption rate
 - **15** chaos experiments passed without customer impact
