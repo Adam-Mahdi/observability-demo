@@ -55,8 +55,8 @@ graph TB
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/observability-excellence-demo
-cd observability-excellence-demo
+git clone https://github.com/yourusername/observability-demo
+cd observability-demo
 
 # Set up environment variables
 cp .env.example .env
