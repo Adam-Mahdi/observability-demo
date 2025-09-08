@@ -1,6 +1,6 @@
 # 🔍 Observability Excellence Demo
 
-> A production-grade observability implementation showcasing modern SRE practices, monitoring excellence, and developer empowerment.
+> Observability implementation showcasing modern SRE practices, monitoring, and developer.
 
 ## 🎯 Project Overview
 
