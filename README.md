@@ -1,4 +1,4 @@
-# 🔍 Observability Excellence Demo
+# Observability Demo
 
 > Observability implementation showcasing modern SRE practices, monitoring, and developer.
 
@@ -12,7 +12,7 @@ This repository demonstrates a comprehensive observability solution designed for
 - **Chaos engineering** practices for proactive resilience testing
 - **On-call excellence** with battle-tested runbooks and incident response
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 graph TB
@@ -42,7 +42,6 @@ graph TB
     end
 ```
 
-## 🚀 Quick Start
 
 ### Prerequisites
 - Kubernetes cluster (EKS preferred)
@@ -82,9 +81,9 @@ helm install datadog-agent datadog/datadog \
 kubectl apply -f backstage/
 ```
 
-## 📊 Key Features
+## Key Features
 
-### 1. Datadog Monitoring Excellence
+### 1. Datadog Monitoring 
 
 #### Alert Hygiene Dashboard
 - **MTTR Tracking**: Real-time mean time to resolution metrics
@@ -204,7 +203,7 @@ spec:
 - **0.8** error budget consumption rate
 - **15** chaos experiments passed without customer impact
 
-## 🛠️ Technologies Used
+## Technologies Used
 
 - **Monitoring**: Datadog, OpenTelemetry, Prometheus
 - **Infrastructure**: Terraform, Kubernetes (EKS), AWS
@@ -213,7 +212,7 @@ spec:
 - **Incident Management**: PagerDuty, Slack
 - **Log Aggregation**: Fluent Bit, FireLens
 
-## 🎓 Lessons Learned
+## Lessons Learned
 
 1. **Alert Quality > Quantity**: Fewer, high-quality alerts reduce fatigue
 2. **SLOs Drive Priorities**: Error budgets align engineering and business goals
@@ -221,7 +220,7 @@ spec:
 4. **Break Things on Purpose**: Chaos engineering builds confidence
 5. **Documentation is Code**: Runbooks should be version-controlled and tested
 
-## 🚦 Next Steps
+## Next Steps
 
 - [ ] Implement distributed tracing with Jaeger
 - [ ] Add cost optimization dashboards
