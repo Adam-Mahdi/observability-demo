@@ -79,7 +79,6 @@ helm install datadog-agent datadog/datadog \
 
 # Deploy Backstage catalog
 kubectl apply -f backstage/
-```
 
 ## Quick Start / Running the Demo
 
@@ -96,8 +95,7 @@ open http://localhost:8080
 
 # Simulate an incident
 ./simulate-outage.sh
-
-
+```
 
 ## Key Features
 
