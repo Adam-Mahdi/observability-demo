@@ -21,9 +21,6 @@ Thumbs.db
 *.backup
 *.bak
 
-# LibreOffice lock files
-.~lock.*
-
 # Python
 __pycache__/
 *.py[cod]
